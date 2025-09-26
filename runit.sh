@@ -1,2 +1,2 @@
-cd build/src
+cd build
 ./risk_assessment_engine 

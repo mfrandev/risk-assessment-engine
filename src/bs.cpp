@@ -1,4 +1,4 @@
-#include "risk/bs.hpp"
+#include <risk/bs.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -99,7 +99,7 @@ BSGreeks finish_greeks(bool is_call,
         const double nd1_put = normal_cdf(-d1);
         const double nd2_put = normal_cdf(-d2);
         g.price = strike * disc * nd2_put - spot * nd1_put;
-        g.delta = nd1_put - 1.0;
+        g.delta = -nd1_put;
         g.theta = -(spot * pdf_d1 * vol) / (2.0 * sqrt_tau) + rate * strike * disc * nd2_put;
         g.rho = -strike * tau * disc * nd2_put;
     }

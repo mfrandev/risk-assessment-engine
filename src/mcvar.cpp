@@ -1,4 +1,4 @@
-#include "risk/mcvar.hpp"
+#include <risk/mcvar.hpp>
 
 #include <algorithm>
 #include <atomic>
@@ -11,8 +11,8 @@
 
 #include <Eigen/Dense>
 
-#include "risk/bs.hpp"
-#include "risk/utils.hpp"
+#include <risk/bs.hpp>
+#include <risk/utils.hpp>
 
 namespace risk {
 

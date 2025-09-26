@@ -42,6 +42,7 @@
 
 #  CMakeLists Builds
 build/
+build_test/
 
 # VS Code
 .vscode/

@@ -1,4 +1,4 @@
 rm -rf build
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake -S ./src -B build -DCMAKE_BUILD_TYPE=Release
 cd build
 make
