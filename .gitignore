@@ -42,3 +42,6 @@
 
 #  CMakeLists Builds
 build/
+
+# VS Code
+.vscode/

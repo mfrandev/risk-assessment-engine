@@ -1,5 +1,6 @@
 include_directories(
     "."
+    "../include/risk"
 )
 
 file(
@@ -8,4 +9,8 @@ file(
 )
 
 add_executable(risk_assessment_engine ${SOURCES})
-target_link_libraries(risk_assessment_engine PRIVATE spdlog::spdlog)
+
+target_include_directories(
+    risk_assessment_engine PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
