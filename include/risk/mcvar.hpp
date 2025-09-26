@@ -1,11 +1,10 @@
 #pragma once
 
 #include <cstdint>
+#include <span>
 
-#include <Eigen/Dense>
-
-#include "risk/instrument_soa.hpp"
 #include "risk/hvar.hpp"
+#include "risk/instrument_soa.hpp"
 
 namespace risk {
 
@@ -17,9 +16,10 @@ struct MCParams {
 };
 
 // Monte Carlo VaR/CVaR using log-normal shocks on underlying factors.
+// `mu` is the per-factor drift vector, `cov` is a row-major covariance matrix (dim x dim).
 RiskMetrics mc_var(const InstrumentSoA& instruments,
-                   const Eigen::VectorXd& mu,
-                   const Eigen::MatrixXd& cov,
+                   std::span<const double> mu,
+                   std::span<const double> cov,
                    double horizon_days,
                    double alpha,
                    const MCParams& params);

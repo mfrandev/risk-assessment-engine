@@ -30,7 +30,6 @@ add_executable(risk_tests
 
 target_include_directories(risk_tests PRIVATE
     ${PROJECT_ROOT}/include
-    ${PROJECT_ROOT}/lib/eigen
 )
 
 if (NOT TARGET Catch2::Catch2WithMain)

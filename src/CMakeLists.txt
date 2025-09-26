@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include_directories(
     "."
-    "../include/risk"
+    "../include"
 )
 
 file(
@@ -23,6 +23,5 @@ add_executable(risk_assessment_engine ${SOURCES})
 
 target_include_directories(
     risk_assessment_engine PRIVATE
-    ${CMAKE_SOURCE_DIR}/../include
-    ${CMAKE_SOURCE_DIR}/../lib/eigen
+    ${CMAKE_SOURCE_DIR}/include
 )

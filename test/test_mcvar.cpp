@@ -2,8 +2,7 @@
 #include <catch2/catch_approx.hpp>
 
 #include <cmath>
-
-#include <Eigen/Dense>
+#include <vector>
 
 #include <risk/instrument.hpp>
 #include <risk/instrument_soa.hpp>
@@ -27,9 +26,8 @@ risk::InstrumentSoA make_single_equity(double price, double qty = 1.0) {
 TEST_CASE("mc_var returns zero risk when drift and covariance are zero") {
     const auto soa = make_single_equity(100.0);
 
-    Eigen::VectorXd mu(1);
-    mu << 0.0;
-    Eigen::MatrixXd cov = Eigen::MatrixXd::Zero(1, 1);
+    const std::vector<double> mu{0.0};
+    const std::vector<double> cov{0.0};
 
     const risk::MCParams params{
         .paths = 64,
@@ -46,9 +44,8 @@ TEST_CASE("mc_var returns zero risk when drift and covariance are zero") {
 TEST_CASE("mc_var matches deterministic drift-only scenario") {
     const auto soa = make_single_equity(100.0);
 
-    Eigen::VectorXd mu(1);
-    mu << -0.02; // -2% expected log-return over horizon
-    Eigen::MatrixXd cov = Eigen::MatrixXd::Zero(1, 1);
+    const std::vector<double> mu{-0.02}; // -2% expected log-return over horizon
+    const std::vector<double> cov{0.0};
 
     const risk::MCParams params{
         .paths = 16,

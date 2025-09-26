@@ -3,13 +3,11 @@
 #include <iostream>
 #include <vector>
 
-#include <Eigen/Dense>
-
+#include <risk/greeks.hpp>
 #include <risk/hvar.hpp>
 #include <risk/instrument.hpp>
 #include <risk/instrument_soa.hpp>
 #include <risk/mcvar.hpp>
-#include <risk/greeks.hpp>
 
 int main() {
     std::vector<risk::Instrument> portfolio;
@@ -56,10 +54,8 @@ int main() {
         std::cout << "Sample 99% one-day HVaR: $" << hist_metrics.var << '\n';
         std::cout << "Sample 99% one-day HCVaR: $" << hist_metrics.cvar << '\n';
 
-        Eigen::VectorXd mu(1);
-        mu << 0.0003;        // 0.03% daily drift
-        Eigen::MatrixXd cov(1, 1);
-        cov(0, 0) = 0.0001;  // (1% daily vol)^2
+        const std::vector<double> mu{0.0003};        // 0.03% daily drift
+        const std::vector<double> cov{0.0001};       // (1% daily vol)^2
 
         const risk::MCParams mc_params{
             .paths = 20000,
