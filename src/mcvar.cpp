@@ -108,12 +108,12 @@ double revalue_once(const InstrumentSoA& instruments,
 
 } // namespace
 
-double mc_var(const InstrumentSoA& instruments,
-              const Eigen::VectorXd& mu,
-              const Eigen::MatrixXd& cov,
-              double horizon_days,
-              double alpha,
-              const MCParams& params) {
+RiskMetrics mc_var(const InstrumentSoA& instruments,
+                   const Eigen::VectorXd& mu,
+                   const Eigen::MatrixXd& cov,
+                   double horizon_days,
+                   double alpha,
+                   const MCParams& params) {
     if (mu.size() == 0) {
         throw std::invalid_argument("mu vector must be non-empty");
     }
@@ -180,8 +180,24 @@ double mc_var(const InstrumentSoA& instruments,
         th.join();
     }
 
-    const double quantile = quantile_inplace(pnl, std::clamp(1.0 - alpha, 0.0, 1.0));
-    return -quantile;
+    const double q = std::clamp(1.0 - alpha, 0.0, 1.0);
+    const double quantile = quantile_inplace(pnl, q);
+
+    double tail_sum = 0.0;
+    std::size_t tail_count = 0;
+    for (double x : pnl) {
+        if (x <= quantile) {
+            tail_sum += x;
+            ++tail_count;
+        }
+    }
+    if (tail_count == 0) {
+        tail_sum += quantile;
+        tail_count = 1;
+    }
+    const double cvar = -(tail_sum / static_cast<double>(tail_count));
+
+    return RiskMetrics{.var = -quantile, .cvar = cvar};
 }
 
 } // namespace risk

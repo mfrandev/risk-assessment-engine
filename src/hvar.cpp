@@ -97,14 +97,14 @@ double revalue_portfolio(const InstrumentSoA& instruments,
     return value_shocked - value_today;
 }
 
-double historical_var(const InstrumentSoA& instruments,
-                      const std::vector<std::vector<double>>& shock_matrix,
-                      double confidence) {
-        if (shock_matrix.empty()) {
-            throw std::invalid_argument("shock matrix is empty");
-        }
+RiskMetrics historical_var(const InstrumentSoA& instruments,
+                           const std::vector<std::vector<double>>& shock_matrix,
+                           double confidence) {
+    if (shock_matrix.empty()) {
+        throw std::invalid_argument("shock matrix is empty");
+    }
 
-        if (!(confidence > kMinConfidence && confidence < kMaxConfidence)) {
+    if (!(confidence > kMinConfidence && confidence < kMaxConfidence)) {
             throw std::invalid_argument("confidence must be in (0,1)");
         }
 
@@ -119,9 +119,22 @@ double historical_var(const InstrumentSoA& instruments,
         ++scenario_index;
     }
 
-        const double q = std::clamp(1.0 - confidence, 0.0, 1.0);
-        const double var_quantile = quantile_inplace(pnls, q);
-        return -var_quantile;
+    const double q = std::clamp(1.0 - confidence, 0.0, 1.0);
+    const double var_quantile = quantile_inplace(pnls, q);
+    double tail_sum = 0.0;
+    std::size_t tail_count = 0;
+    for (double pnl : pnls) {
+        if (pnl <= var_quantile) {
+            tail_sum += pnl;
+            ++tail_count;
+        }
     }
+    if (tail_count == 0) {
+        tail_sum += var_quantile;
+        tail_count = 1;
+    }
+    const double cvar = -(tail_sum / static_cast<double>(tail_count));
+    return RiskMetrics{.var = -var_quantile, .cvar = cvar};
+}
 
 } // namespace risk

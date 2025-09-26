@@ -52,8 +52,9 @@ int main() {
 
     try {
         std::clog << "==================== HVaR ====================\n";
-        const double var_99 = risk::historical_var(soa, shocks, 0.99);
-        std::cout << "Sample 99% one-day HVaR: $" << var_99 << '\n';
+        const risk::RiskMetrics hist_metrics = risk::historical_var(soa, shocks, 0.99);
+        std::cout << "Sample 99% one-day HVaR: $" << hist_metrics.var << '\n';
+        std::cout << "Sample 99% one-day HCVaR: $" << hist_metrics.cvar << '\n';
 
         Eigen::VectorXd mu(1);
         mu << 0.0003;        // 0.03% daily drift
@@ -64,12 +65,13 @@ int main() {
             .paths = 20000,
             .seed = 123456789ULL,
             .use_cholesky = true,
-            .threads = 2
+            .threads = 0
         };
 
         std::clog << "==================== MCVaR ====================\n";
-        const double mc_var_99 = risk::mc_var(soa, mu, cov, 1.0, 0.99, mc_params);
-        std::cout << "Sample 99% one-day MCVaR: $" << mc_var_99 << '\n';
+        const risk::RiskMetrics mc_metrics = risk::mc_var(soa, mu, cov, 1.0, 0.99, mc_params);
+        std::cout << "Sample 99% one-day MCVaR: $" << mc_metrics.var << '\n';
+        std::cout << "Sample 99% one-day MCVaR (ES): $" << mc_metrics.cvar << '\n';
 
         std::vector<risk::bs::BSGreeks> greeks_per_contract;
         std::vector<risk::bs::BSGreeks> greeks_position;
