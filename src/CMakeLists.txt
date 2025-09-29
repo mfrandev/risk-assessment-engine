@@ -23,5 +23,7 @@ add_executable(risk_assessment_engine ${SOURCES})
 
 target_include_directories(
     risk_assessment_engine PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/../include
+    ${CMAKE_SOURCE_DIR}/../lib/CLI11/include
+    ${CMAKE_SOURCE_DIR}/../lib/spdlog/include
 )

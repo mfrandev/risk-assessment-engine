@@ -16,7 +16,10 @@ set(RISK_CORE_SOURCES
     ${PROJECT_ROOT}/src/greeks.cpp
     ${PROJECT_ROOT}/src/hvar.cpp
     ${PROJECT_ROOT}/src/instrument_soa.cpp
+    ${PROJECT_ROOT}/src/market.cpp
     ${PROJECT_ROOT}/src/mcvar.cpp
+    ${PROJECT_ROOT}/src/portfolio.cpp
+    ${PROJECT_ROOT}/src/universe.cpp
     ${PROJECT_ROOT}/src/utils.cpp
 )
 
@@ -30,6 +33,7 @@ add_executable(risk_tests
 
 target_include_directories(risk_tests PRIVATE
     ${PROJECT_ROOT}/include
+    ${PROJECT_ROOT}/lib/spdlog/include
 )
 
 if (NOT TARGET Catch2::Catch2WithMain)

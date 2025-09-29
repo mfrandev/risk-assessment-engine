@@ -2,16 +2,20 @@
 #include <catch2/catch_approx.hpp>
 
 #include <cmath>
-#include <vector>
+
+#include <risk/eigen_stub.hpp>
 
 #include <risk/instrument.hpp>
 #include <risk/instrument_soa.hpp>
 #include <risk/mcvar.hpp>
+#include <risk/universe.hpp>
 
 using Catch::Approx;
 
 namespace {
+
 risk::InstrumentSoA make_single_equity(double price, double qty = 1.0) {
+    risk::set_universe({"SPY", "QQQ", "XOM", "TSLA", "AAPL", "WMT"});
     risk::Instrument inst{};
     inst.id = 0;
     inst.type = risk::InstrumentType::Equity;
@@ -21,42 +25,45 @@ risk::InstrumentSoA make_single_equity(double price, double qty = 1.0) {
     inst.underlying_index = 0;
     return risk::to_struct_of_arrays({inst});
 }
-}
 
-TEST_CASE("mc_var returns zero risk when drift and covariance are zero") {
+} // namespace
+
+TEST_CASE("compute_mcvar returns zero risk when drift and covariance are zero") {
     const auto soa = make_single_equity(100.0);
+    const std::size_t universe_size = risk::universe_size();
 
-    const std::vector<double> mu{0.0};
-    const std::vector<double> cov{0.0};
+    Eigen::VectorXd mu = Eigen::VectorXd::Zero(universe_size);
+    Eigen::MatrixXd cov = Eigen::MatrixXd::Zero(universe_size, universe_size);
 
-    const risk::MCParams params{
-        .paths = 64,
-        .seed = 42,
-        .use_cholesky = false,
-        .threads = 1
-    };
-
-    const auto metrics = risk::mc_var(soa, mu, cov, 1.0, 0.99, params);
+    const auto metrics = risk::compute_mcvar(soa,
+                                             mu,
+                                             cov,
+                                             /*horizon_days=*/1.0,
+                                             /*alpha=*/0.99,
+                                             /*paths=*/64,
+                                             /*seed=*/42ULL);
     REQUIRE(metrics.var == Approx(0.0).margin(1e-9));
     REQUIRE(metrics.cvar == Approx(0.0).margin(1e-9));
 }
 
-TEST_CASE("mc_var matches deterministic drift-only scenario") {
+TEST_CASE("compute_mcvar matches deterministic drift-only scenario") {
     const auto soa = make_single_equity(100.0);
+    const std::size_t universe_size = risk::universe_size();
 
-    const std::vector<double> mu{-0.02}; // -2% expected log-return over horizon
-    const std::vector<double> cov{0.0};
+    Eigen::VectorXd mu = Eigen::VectorXd::Zero(universe_size);
+    mu(0) = -0.02; // -2% expected return over horizon
 
-    const risk::MCParams params{
-        .paths = 16,
-        .seed = 7,
-        .use_cholesky = false,
-        .threads = 1
-    };
+    Eigen::MatrixXd cov = Eigen::MatrixXd::Zero(universe_size, universe_size);
 
-    const auto metrics = risk::mc_var(soa, mu, cov, 1.0, 0.99, params);
+    const auto metrics = risk::compute_mcvar(soa,
+                                             mu,
+                                             cov,
+                                             /*horizon_days=*/1.0,
+                                             /*alpha=*/0.99,
+                                             /*paths=*/16,
+                                             /*seed=*/7ULL);
 
-    const double expected_loss = 100.0 - 100.0 * std::exp(-0.02);
+    const double expected_loss = 100.0 - 100.0 * std::exp(mu(0));
     REQUIRE(metrics.var == Approx(expected_loss).margin(1e-6));
     REQUIRE(metrics.cvar == Approx(expected_loss).margin(1e-6));
 }

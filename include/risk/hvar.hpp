@@ -1,25 +1,23 @@
 #pragma once
 
 #include <cstddef>
-#include <span>
 #include <vector>
 
 #include <risk/instrument_soa.hpp>
-#include <utility>
 
 namespace risk {
 
 struct RiskMetrics {
-    double var;
-    double cvar;
+    double var = 0.0;
+    double cvar = 0.0;
 };
 
-double revalue_portfolio(const InstrumentSoA& instruments,
-                         std::span<const double> shocks,
-                         std::size_t scenario_index);
+double hvarday(const InstrumentSoA& soa, const double* shocks_row);
 
-RiskMetrics historical_var(const InstrumentSoA& instruments,
-                           const std::vector<std::vector<double>>& shock_matrix,
-                           double confidence);
+RiskMetrics compute_hvar(const InstrumentSoA& soa,
+                         const std::vector<double>& shocks_flat,
+                         std::size_t Tm1,
+                         std::size_t N,
+                         double alpha);
 
 } // namespace risk
