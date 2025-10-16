@@ -26,4 +26,10 @@ target_include_directories(
     ${CMAKE_SOURCE_DIR}/../include
     ${CMAKE_SOURCE_DIR}/../lib/CLI11/include
     ${CMAKE_SOURCE_DIR}/../lib/spdlog/include
+    ${CMAKE_SOURCE_DIR}/../lib/capi
+)
+
+target_link_libraries(
+    risk_assessment_engine PRIVATE
+    ${CMAKE_SOURCE_DIR}/../lib/capi/l64/c.o
 )

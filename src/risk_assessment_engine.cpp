@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <exception>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -15,6 +16,7 @@
 #include <risk/hvar.hpp>
 #include <risk/instrument.hpp>
 #include <risk/instrument_soa.hpp>
+#include <risk/kdb_connection.hpp>
 #include <risk/market.hpp>
 #include <risk/mcvar.hpp>
 #include <risk/portfolio.hpp>
@@ -97,12 +99,28 @@ int main(int argc, char** argv) {
 
     std::string portfolio_path;
     std::string market_path;
+    std::string kdb_host = "localhost";
+    int kdb_port = 5000;
+    std::string kdb_credentials;
+    bool connect_to_kdb = false;
 
     app.add_option("-p,--portfolio", portfolio_path, "Portfolio CSV path")->required();
     app.add_option("-m,--market", market_path, "Market closes CSV path")->required();
+    app.add_option("--kdb-host", kdb_host, "KDB+ host to connect to")->default_val(kdb_host);
+    app.add_option("--kdb-port", kdb_port, "KDB+ port number")->default_val(kdb_port);
+    app.add_option("--kdb-auth", kdb_credentials, "KDB+ credentials in user:password form");
+    app.add_flag("--connect-kdb", connect_to_kdb, "Connect to the configured KDB+ instance before processing");
 
     try {
         CLI11_PARSE(app, argc, argv);
+
+        std::optional<risk::kdb::Connection> kdb_connection;
+        if (connect_to_kdb) {
+            kdb_connection.emplace(kdb_host, kdb_port, kdb_credentials);
+            spdlog::info("Connected to KDB+ at {}:{}.", kdb_host, kdb_port);
+        } else {
+            spdlog::info("Skipping KDB+ connection (use --connect-kdb to enable).");
+        }
 
         std::vector<std::string> dates;
         std::vector<double> prices_flat;
