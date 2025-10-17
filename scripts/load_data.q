@@ -33,7 +33,14 @@ market: readMarketData marketPath;
 portfolioPath: hsym `$"data/portfolio/portfolio_scenario1.csv"
 
 readPortfolioData: {[f]
-  :("IIBFFFIFFFF";enlist csv) 0: f;
+  res :("IIBFFFIFFFF";enlist csv) 0: f;
+  info["Read portfolio table with ", (string count res), " entries"];
+  :res;
   };
 
 portfolio: readPortfolioData portfolioPath;
+
+pwd: raze system "pwd";
+absPath:pwd, "/scripts/compute_shocks.q";
+
+system("l ", absPath);

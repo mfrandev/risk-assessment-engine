@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <exception>
+#include <iomanip>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -139,11 +140,28 @@ int main(int argc, char** argv) {
             return 1;
         }
 
-        spdlog::info("Loaded market data from '{}' with {} rows and {} tickers.", market_path, T, N);
+        spdlog::debug("Loaded market data from '{}' with {} rows and {} tickers.", market_path, T, N);
 
         std::vector<double> shocks_flat;
         risk::compute_shocks(prices_flat, T, N, shocks_flat);
         const std::size_t scenario_count = T - 1;
+        const auto& symbols = risk::universe_symbols();
+
+        spdlog::info("Shock matrix by equity ({} scenarios per column):", scenario_count);
+        for (std::size_t i = 0; i < N; ++i) {
+            std::ostringstream column_stream;
+            column_stream.setf(std::ios::fixed, std::ios::floatfield);
+            column_stream << std::setprecision(6);
+            column_stream << "[";
+            for (std::size_t t = 0; t < scenario_count; ++t) {
+                if (t > 0) {
+                    column_stream << ", ";
+                }
+                column_stream << shocks_flat[t * N + i];
+            }
+            column_stream << "]";
+            spdlog::debug("  {}: {}", symbols.at(i), column_stream.str());
+        }
 
         risk::InstrumentSoA portfolio;
         if (!risk::load_portfolio_csv(portfolio_path, portfolio, N)) {
@@ -191,14 +209,12 @@ int main(int argc, char** argv) {
         risk::GreeksSummary totals;
         risk::compute_greeks(portfolio, greeks_per_contract, greeks_position, totals);
 
-        const auto& symbols = risk::universe_symbols();
-
         constexpr double days_per_year = 252.0;
         auto theta_per_day = [&](double theta_year) { return theta_year / days_per_year; };
         auto vega_per_percent = [](double vega_one) { return vega_one / 100.0; };
         auto rho_per_percent = [](double rho_one) { return rho_one / 100.0; };
 
-        spdlog::info("==================== Portfolio ====================");
+        spdlog::debug("==================== Portfolio ====================");
         double portfolio_value = 0.0;
         for (std::size_t i = 0; i < greeks_per_contract.size(); ++i) {
             const double qty = portfolio.qty[i];
@@ -216,17 +232,17 @@ int main(int argc, char** argv) {
             const double pc_rho_pct = rho_per_percent(pc.rho);
             const double pos_rho_pct = rho_per_percent(pos.rho);
 
-            spdlog::info("Instrument {} ({})", portfolio.id[i], label);
-            spdlog::info("  Price:    {:.4f} (per contract)", pc.price);
-            spdlog::info("  Position: {:.4f} ({} units)", pos.price, qty);
-            spdlog::info(
+            spdlog::debug("Instrument {} ({})", portfolio.id[i], label);
+            spdlog::debug("  Price:    {:.4f} (per contract)", pc.price);
+            spdlog::debug("  Position: {:.4f} ({} units)", pos.price, qty);
+            spdlog::debug(
                 "  Greeks per contract: Δ={:.4f} shares, Γ={:.4f} 1/$^2, ν={:.4f} $ per 1% vol, Θ={:.4f} $ per day, ρ={:.4f} $ per 1% rate",
                 pc.delta,
                 pc.gamma,
                 pc_vega_pct,
                 pc_theta_day,
                 pc_rho_pct);
-            spdlog::info(
+            spdlog::debug(
                 "  Greeks for position:   Δ={:.4f} shares, Γ={:.4f} 1/$^2, ν={:.4f} $ per 1% vol, Θ={:.4f} $ per day, ρ={:.4f} $ per 1% rate",
                 pos.delta,
                 pos.gamma,
@@ -241,14 +257,14 @@ int main(int argc, char** argv) {
         const double portfolio_vega_pct = vega_per_percent(totals.vega);
         const double portfolio_rho_pct = rho_per_percent(totals.rho);
 
-        spdlog::info("");
-        spdlog::info("Portfolio totals");
-        spdlog::info("  Market value: {:.4f}", portfolio_value);
-        spdlog::info("  Δ: {:.4f} shares", totals.delta);
-        spdlog::info("  Γ: {:.4f} 1/$^2", totals.gamma);
-        spdlog::info("  ν: {:.4f} $ per 1% vol", portfolio_vega_pct);
-        spdlog::info("  Θ: {:.4f} $ per day", portfolio_theta_day);
-        spdlog::info("  ρ: {:.4f} $ per 1% rate", portfolio_rho_pct);
+        spdlog::debug("");
+        spdlog::debug("Portfolio totals");
+        spdlog::debug("  Market value: {:.4f}", portfolio_value);
+        spdlog::debug("  Δ: {:.4f} shares", totals.delta);
+        spdlog::debug("  Γ: {:.4f} 1/$^2", totals.gamma);
+        spdlog::debug("  ν: {:.4f} $ per 1% vol", portfolio_vega_pct);
+        spdlog::debug("  Θ: {:.4f} $ per day", portfolio_theta_day);
+        spdlog::debug("  ρ: {:.4f} $ per 1% rate", portfolio_rho_pct);
 
         spdlog::info("");
         spdlog::info("==================== Historical ====================");
