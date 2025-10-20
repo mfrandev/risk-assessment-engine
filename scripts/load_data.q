@@ -41,6 +41,8 @@ readPortfolioData: {[f]
 portfolio: readPortfolioData portfolioPath;
 
 pwd: raze system "pwd";
-absPath:pwd, "/scripts/compute_shocks.q";
+absPathToComputeShocks:pwd, "/scripts/compute_shocks.q";
+system("l ", absPathToComputeShocks);
 
-system("l ", absPath);
+absPathToMetrics:pwd, "/scripts/metrics.q";
+system("l ", absPathToMetrics);

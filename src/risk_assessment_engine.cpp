@@ -11,6 +11,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <sstream>
 #include <vector>
 
 #include <risk/greeks.hpp>
@@ -115,6 +116,9 @@ int main(int argc, char** argv) {
     try {
         CLI11_PARSE(app, argc, argv);
 
+        spdlog::set_level(spdlog::level::debug);
+
+
         std::optional<risk::kdb::Connection> kdb_connection;
         if (connect_to_kdb) {
             kdb_connection.emplace(kdb_host, kdb_port, kdb_credentials);
@@ -195,6 +199,42 @@ int main(int argc, char** argv) {
 
         Eigen::VectorXd mu = compute_sample_mean(shocks_flat, scenario_count, N);
         Eigen::MatrixXd cov = compute_sample_covariance(shocks_flat, mu, scenario_count, N);
+
+        auto format_vector = [](const Eigen::VectorXd& vec) {
+            std::ostringstream oss;
+            oss.setf(std::ios::fixed, std::ios::floatfield);
+            oss << std::setprecision(6);
+            oss << "[";
+            for (Eigen::Index i = 0; i < vec.size(); ++i) {
+                if (i > 0) {
+                    oss << ", ";
+                }
+                oss << vec(i);
+            }
+            oss << "]";
+            return oss.str();
+        };
+
+        auto format_matrix_row = [](const Eigen::MatrixXd& mat, Eigen::Index row) {
+            std::ostringstream oss;
+            oss.setf(std::ios::fixed, std::ios::floatfield);
+            oss << std::setprecision(6);
+            oss << "[";
+            for (Eigen::Index col = 0; col < mat.cols(); ++col) {
+                if (col > 0) {
+                    oss << ", ";
+                }
+                oss << mat(row, col);
+            }
+            oss << "]";
+            return oss.str();
+        };
+
+        spdlog::debug("Sample mean ({} factors): {}", mu.size(), format_vector(mu));
+        spdlog::debug("Sample covariance matrix ({}x{}):", cov.rows(), cov.cols());
+        for (Eigen::Index row = 0; row < cov.rows(); ++row) {
+            spdlog::debug("  {}", format_matrix_row(cov, row));
+        }
 
         const risk::RiskMetrics mc_metrics = risk::compute_mcvar(portfolio,
                                                                  mu,
