@@ -37,3 +37,4 @@ shocks:flip shocksDict;
 info["Computed shocks table with ", (string count shocks), " rows."];
 shocks;
 
+getShockData: {:shocks};

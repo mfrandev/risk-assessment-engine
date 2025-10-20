@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <string>
 #include <sstream>
+#include <utility>
 #include <vector>
 
 #include <risk/greeks.hpp>
@@ -19,6 +20,7 @@
 #include <risk/instrument.hpp>
 #include <risk/instrument_soa.hpp>
 #include <risk/kdb_connection.hpp>
+#include <risk/kdb_loader.hpp>
 #include <risk/market.hpp>
 #include <risk/mcvar.hpp>
 #include <risk/portfolio.hpp>
@@ -129,26 +131,105 @@ int main(int argc, char** argv) {
 
         std::vector<std::string> dates;
         std::vector<double> prices_flat;
+        std::vector<double> shocks_flat;
         std::size_t T = 0;
         std::size_t N = 0;
+        std::size_t scenario_count = 0;
 
-        if (!risk::load_closes_csv(market_path, dates, prices_flat, T, N)) {
+        risk::InstrumentSoA portfolio;
+        Eigen::VectorXd mu;
+        Eigen::MatrixXd cov;
+
+        bool using_kdb_data = false;
+
+        if (connect_to_kdb && kdb_connection && kdb_connection->is_connected()) {
+            try {
+                auto market_snapshot = risk::kdb::load_market_data(kdb_connection->handle());
+                dates = std::move(market_snapshot.dates);
+                prices_flat = std::move(market_snapshot.closes_flat);
+                N = market_snapshot.tickers.size();
+                T = dates.size();
+                if (risk::universe_size() != N) {
+                    throw std::runtime_error("Universe size mismatch after loading market data from KDB+");
+                }
+                if (T < 2) {
+                    throw std::runtime_error("KDB+ market data requires at least two rows");
+                }
+
+                portfolio = risk::kdb::load_portfolio_data(kdb_connection->handle(), N);
+
+                auto shock_snapshot = risk::kdb::load_shock_data(kdb_connection->handle(), N);
+                shocks_flat = std::move(shock_snapshot.shocks_flat);
+                if (shocks_flat.empty()) {
+                    throw std::runtime_error("KDB+ shock data is empty");
+                }
+                scenario_count = shocks_flat.size() / N;
+                if (scenario_count == 0 || shocks_flat.size() != scenario_count * N) {
+                    throw std::runtime_error("KDB+ shock matrix has inconsistent dimensions");
+                }
+
+                mu = risk::kdb::load_sample_mean(kdb_connection->handle(), N);
+                cov = risk::kdb::load_sample_covariance(kdb_connection->handle(), N);
+                using_kdb_data = true;
+
+                spdlog::info("Loaded market, portfolio, and precomputed statistics from KDB+.");
+            } catch (const std::exception& ex) {
+                spdlog::warn("KDB+ load failed: {}. Falling back to CSV inputs.", ex.what());
+                dates.clear();
+                prices_flat.clear();
+                shocks_flat.clear();
+                portfolio = risk::InstrumentSoA{};
+                T = 0;
+                N = 0;
+                scenario_count = 0;
+            }
+        }
+
+        if (!using_kdb_data) {
+            if (!risk::load_closes_csv(market_path, dates, prices_flat, T, N)) {
+                return 1;
+            }
+            if (N != risk::universe_size()) {
+                spdlog::error("Loaded universe size does not match expected universe");
+                return 1;
+            }
+            if (T < 2) {
+                spdlog::error("Need at least two rows of market data to compute shocks");
+                return 1;
+            }
+
+            spdlog::debug("Loaded market data from '{}' with {} rows and {} tickers.", market_path, T, N);
+
+            risk::compute_shocks(prices_flat, T, N, shocks_flat);
+            scenario_count = T - 1;
+
+            if (!risk::load_portfolio_csv(portfolio_path, portfolio, N)) {
+                return 1;
+            }
+            if (portfolio.size() == 0U) {
+                spdlog::error("Portfolio CSV produced no instruments");
+                return 1;
+            }
+
+            mu = compute_sample_mean(shocks_flat, scenario_count, N);
+            cov = compute_sample_covariance(shocks_flat, mu, scenario_count, N);
+        } else {
+            spdlog::debug("Loaded market data from KDB+ with {} rows and {} tickers.", T, N);
+        }
+
+        if (N == 0) {
+            spdlog::error("Universe contains no tickers");
             return 1;
         }
-        if (N != risk::universe_size()) {
-            spdlog::error("Loaded universe size does not match expected universe");
+        if (scenario_count == 0 || shocks_flat.size() != scenario_count * N) {
+            spdlog::error("Shock data has inconsistent dimensions");
             return 1;
         }
-        if (T < 2) {
-            spdlog::error("Need at least two rows of market data to compute shocks");
+        if (portfolio.size() == 0U) {
+            spdlog::error("Portfolio data is empty.");
             return 1;
         }
 
-        spdlog::debug("Loaded market data from '{}' with {} rows and {} tickers.", market_path, T, N);
-
-        std::vector<double> shocks_flat;
-        risk::compute_shocks(prices_flat, T, N, shocks_flat);
-        const std::size_t scenario_count = T - 1;
         const auto& symbols = risk::universe_symbols();
 
         spdlog::info("Shock matrix by equity ({} scenarios per column):", scenario_count);
@@ -167,15 +248,6 @@ int main(int argc, char** argv) {
             spdlog::debug("  {}: {}", symbols.at(i), column_stream.str());
         }
 
-        risk::InstrumentSoA portfolio;
-        if (!risk::load_portfolio_csv(portfolio_path, portfolio, N)) {
-            return 1;
-        }
-        if (portfolio.size() == 0U) {
-            spdlog::error("Portfolio CSV produced no instruments");
-            return 1;
-        }
-
         std::size_t option_count = 0;
         for (std::size_t i = 0; i < portfolio.size(); ++i) {
             if (portfolio.type[i] == static_cast<std::uint8_t>(risk::InstrumentType::Option)) {
@@ -183,8 +255,9 @@ int main(int argc, char** argv) {
             }
         }
         const std::size_t equity_count = portfolio.size() - option_count;
+        const std::string portfolio_origin = using_kdb_data ? "KDB+" : portfolio_path;
         spdlog::info("Loaded portfolio from '{}' with {} instruments ({} equities, {} options).",
-                     portfolio_path,
+                     portfolio_origin,
                      portfolio.size(),
                      equity_count,
                      option_count);
@@ -196,9 +269,6 @@ int main(int argc, char** argv) {
                                                                   scenario_count,
                                                                   N,
                                                                   alpha);
-
-        Eigen::VectorXd mu = compute_sample_mean(shocks_flat, scenario_count, N);
-        Eigen::MatrixXd cov = compute_sample_covariance(shocks_flat, mu, scenario_count, N);
 
         auto format_vector = [](const Eigen::VectorXd& vec) {
             std::ostringstream oss;

@@ -27,6 +27,8 @@ readMarketData:{[f]
 
 market: readMarketData marketPath;
 
+getMarketData: {:market};
+
 // =================================Import Portfolio Data=================================
 
 // Static filepath
@@ -40,9 +42,15 @@ readPortfolioData: {[f]
 
 portfolio: readPortfolioData portfolioPath;
 
+getPortfolioData: {:portfolio};
+
 pwd: raze system "pwd";
 absPathToComputeShocks:pwd, "/scripts/compute_shocks.q";
 system("l ", absPathToComputeShocks);
 
 absPathToMetrics:pwd, "/scripts/metrics.q";
 system("l ", absPathToMetrics);
+
+.api: `getMarketData`getPortfolioData`getShockData`getSampleMeanFromShocks`getSampleCovarianceFromShocks;
+
+// TODO: Implement an ICP whitelist that only permits the functions in .api
