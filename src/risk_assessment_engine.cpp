@@ -7,9 +7,12 @@
 
 #include <algorithm>
 #include <exception>
+#include <iomanip>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <sstream>
+#include <utility>
 #include <vector>
 
 #include <risk/greeks.hpp>
@@ -17,6 +20,7 @@
 #include <risk/instrument.hpp>
 #include <risk/instrument_soa.hpp>
 #include <risk/kdb_connection.hpp>
+#include <risk/kdb_loader.hpp>
 #include <risk/market.hpp>
 #include <risk/mcvar.hpp>
 #include <risk/portfolio.hpp>
@@ -114,6 +118,9 @@ int main(int argc, char** argv) {
     try {
         CLI11_PARSE(app, argc, argv);
 
+        spdlog::set_level(spdlog::level::debug);
+
+
         std::optional<risk::kdb::Connection> kdb_connection;
         if (connect_to_kdb) {
             kdb_connection.emplace(kdb_host, kdb_port, kdb_credentials);
@@ -124,34 +131,121 @@ int main(int argc, char** argv) {
 
         std::vector<std::string> dates;
         std::vector<double> prices_flat;
+        std::vector<double> shocks_flat;
         std::size_t T = 0;
         std::size_t N = 0;
-
-        if (!risk::load_closes_csv(market_path, dates, prices_flat, T, N)) {
-            return 1;
-        }
-        if (N != risk::universe_size()) {
-            spdlog::error("Loaded universe size does not match expected universe");
-            return 1;
-        }
-        if (T < 2) {
-            spdlog::error("Need at least two rows of market data to compute shocks");
-            return 1;
-        }
-
-        spdlog::info("Loaded market data from '{}' with {} rows and {} tickers.", market_path, T, N);
-
-        std::vector<double> shocks_flat;
-        risk::compute_shocks(prices_flat, T, N, shocks_flat);
-        const std::size_t scenario_count = T - 1;
+        std::size_t scenario_count = 0;
 
         risk::InstrumentSoA portfolio;
-        if (!risk::load_portfolio_csv(portfolio_path, portfolio, N)) {
+        Eigen::VectorXd mu;
+        Eigen::MatrixXd cov;
+
+        bool using_kdb_data = false;
+
+        if (connect_to_kdb && kdb_connection && kdb_connection->is_connected()) {
+            try {
+                auto market_snapshot = risk::kdb::load_market_data(kdb_connection->handle());
+                dates = std::move(market_snapshot.dates);
+                prices_flat = std::move(market_snapshot.closes_flat);
+                N = market_snapshot.tickers.size();
+                T = dates.size();
+                if (risk::universe_size() != N) {
+                    throw std::runtime_error("Universe size mismatch after loading market data from KDB+");
+                }
+                if (T < 2) {
+                    throw std::runtime_error("KDB+ market data requires at least two rows");
+                }
+
+                portfolio = risk::kdb::load_portfolio_data(kdb_connection->handle(), N);
+
+                auto shock_snapshot = risk::kdb::load_shock_data(kdb_connection->handle(), N);
+                shocks_flat = std::move(shock_snapshot.shocks_flat);
+                if (shocks_flat.empty()) {
+                    throw std::runtime_error("KDB+ shock data is empty");
+                }
+                scenario_count = shocks_flat.size() / N;
+                if (scenario_count == 0 || shocks_flat.size() != scenario_count * N) {
+                    throw std::runtime_error("KDB+ shock matrix has inconsistent dimensions");
+                }
+
+                mu = risk::kdb::load_sample_mean(kdb_connection->handle(), N);
+                cov = risk::kdb::load_sample_covariance(kdb_connection->handle(), N);
+                using_kdb_data = true;
+
+                spdlog::info("Loaded market, portfolio, and precomputed statistics from KDB+.");
+            } catch (const std::exception& ex) {
+                spdlog::warn("KDB+ load failed: {}. Falling back to CSV inputs.", ex.what());
+                dates.clear();
+                prices_flat.clear();
+                shocks_flat.clear();
+                portfolio = risk::InstrumentSoA{};
+                T = 0;
+                N = 0;
+                scenario_count = 0;
+            }
+        }
+
+        if (!using_kdb_data) {
+            if (!risk::load_closes_csv(market_path, dates, prices_flat, T, N)) {
+                return 1;
+            }
+            if (N != risk::universe_size()) {
+                spdlog::error("Loaded universe size does not match expected universe");
+                return 1;
+            }
+            if (T < 2) {
+                spdlog::error("Need at least two rows of market data to compute shocks");
+                return 1;
+            }
+
+            spdlog::debug("Loaded market data from '{}' with {} rows and {} tickers.", market_path, T, N);
+
+            risk::compute_shocks(prices_flat, T, N, shocks_flat);
+            scenario_count = T - 1;
+
+            if (!risk::load_portfolio_csv(portfolio_path, portfolio, N)) {
+                return 1;
+            }
+            if (portfolio.size() == 0U) {
+                spdlog::error("Portfolio CSV produced no instruments");
+                return 1;
+            }
+
+            mu = compute_sample_mean(shocks_flat, scenario_count, N);
+            cov = compute_sample_covariance(shocks_flat, mu, scenario_count, N);
+        } else {
+            spdlog::debug("Loaded market data from KDB+ with {} rows and {} tickers.", T, N);
+        }
+
+        if (N == 0) {
+            spdlog::error("Universe contains no tickers");
+            return 1;
+        }
+        if (scenario_count == 0 || shocks_flat.size() != scenario_count * N) {
+            spdlog::error("Shock data has inconsistent dimensions");
             return 1;
         }
         if (portfolio.size() == 0U) {
-            spdlog::error("Portfolio CSV produced no instruments");
+            spdlog::error("Portfolio data is empty.");
             return 1;
+        }
+
+        const auto& symbols = risk::universe_symbols();
+
+        spdlog::info("Shock matrix by equity ({} scenarios per column):", scenario_count);
+        for (std::size_t i = 0; i < N; ++i) {
+            std::ostringstream column_stream;
+            column_stream.setf(std::ios::fixed, std::ios::floatfield);
+            column_stream << std::setprecision(6);
+            column_stream << "[";
+            for (std::size_t t = 0; t < scenario_count; ++t) {
+                if (t > 0) {
+                    column_stream << ", ";
+                }
+                column_stream << shocks_flat[t * N + i];
+            }
+            column_stream << "]";
+            spdlog::debug("  {}: {}", symbols.at(i), column_stream.str());
         }
 
         std::size_t option_count = 0;
@@ -161,8 +255,9 @@ int main(int argc, char** argv) {
             }
         }
         const std::size_t equity_count = portfolio.size() - option_count;
+        const std::string portfolio_origin = using_kdb_data ? "KDB+" : portfolio_path;
         spdlog::info("Loaded portfolio from '{}' with {} instruments ({} equities, {} options).",
-                     portfolio_path,
+                     portfolio_origin,
                      portfolio.size(),
                      equity_count,
                      option_count);
@@ -175,8 +270,41 @@ int main(int argc, char** argv) {
                                                                   N,
                                                                   alpha);
 
-        Eigen::VectorXd mu = compute_sample_mean(shocks_flat, scenario_count, N);
-        Eigen::MatrixXd cov = compute_sample_covariance(shocks_flat, mu, scenario_count, N);
+        auto format_vector = [](const Eigen::VectorXd& vec) {
+            std::ostringstream oss;
+            oss.setf(std::ios::fixed, std::ios::floatfield);
+            oss << std::setprecision(6);
+            oss << "[";
+            for (Eigen::Index i = 0; i < vec.size(); ++i) {
+                if (i > 0) {
+                    oss << ", ";
+                }
+                oss << vec(i);
+            }
+            oss << "]";
+            return oss.str();
+        };
+
+        auto format_matrix_row = [](const Eigen::MatrixXd& mat, Eigen::Index row) {
+            std::ostringstream oss;
+            oss.setf(std::ios::fixed, std::ios::floatfield);
+            oss << std::setprecision(6);
+            oss << "[";
+            for (Eigen::Index col = 0; col < mat.cols(); ++col) {
+                if (col > 0) {
+                    oss << ", ";
+                }
+                oss << mat(row, col);
+            }
+            oss << "]";
+            return oss.str();
+        };
+
+        spdlog::debug("Sample mean ({} factors): {}", mu.size(), format_vector(mu));
+        spdlog::debug("Sample covariance matrix ({}x{}):", cov.rows(), cov.cols());
+        for (Eigen::Index row = 0; row < cov.rows(); ++row) {
+            spdlog::debug("  {}", format_matrix_row(cov, row));
+        }
 
         const risk::RiskMetrics mc_metrics = risk::compute_mcvar(portfolio,
                                                                  mu,
@@ -191,14 +319,12 @@ int main(int argc, char** argv) {
         risk::GreeksSummary totals;
         risk::compute_greeks(portfolio, greeks_per_contract, greeks_position, totals);
 
-        const auto& symbols = risk::universe_symbols();
-
         constexpr double days_per_year = 252.0;
         auto theta_per_day = [&](double theta_year) { return theta_year / days_per_year; };
         auto vega_per_percent = [](double vega_one) { return vega_one / 100.0; };
         auto rho_per_percent = [](double rho_one) { return rho_one / 100.0; };
 
-        spdlog::info("==================== Portfolio ====================");
+        spdlog::debug("==================== Portfolio ====================");
         double portfolio_value = 0.0;
         for (std::size_t i = 0; i < greeks_per_contract.size(); ++i) {
             const double qty = portfolio.qty[i];
@@ -216,17 +342,17 @@ int main(int argc, char** argv) {
             const double pc_rho_pct = rho_per_percent(pc.rho);
             const double pos_rho_pct = rho_per_percent(pos.rho);
 
-            spdlog::info("Instrument {} ({})", portfolio.id[i], label);
-            spdlog::info("  Price:    {:.4f} (per contract)", pc.price);
-            spdlog::info("  Position: {:.4f} ({} units)", pos.price, qty);
-            spdlog::info(
+            spdlog::debug("Instrument {} ({})", portfolio.id[i], label);
+            spdlog::debug("  Price:    {:.4f} (per contract)", pc.price);
+            spdlog::debug("  Position: {:.4f} ({} units)", pos.price, qty);
+            spdlog::debug(
                 "  Greeks per contract: Δ={:.4f} shares, Γ={:.4f} 1/$^2, ν={:.4f} $ per 1% vol, Θ={:.4f} $ per day, ρ={:.4f} $ per 1% rate",
                 pc.delta,
                 pc.gamma,
                 pc_vega_pct,
                 pc_theta_day,
                 pc_rho_pct);
-            spdlog::info(
+            spdlog::debug(
                 "  Greeks for position:   Δ={:.4f} shares, Γ={:.4f} 1/$^2, ν={:.4f} $ per 1% vol, Θ={:.4f} $ per day, ρ={:.4f} $ per 1% rate",
                 pos.delta,
                 pos.gamma,
@@ -241,14 +367,14 @@ int main(int argc, char** argv) {
         const double portfolio_vega_pct = vega_per_percent(totals.vega);
         const double portfolio_rho_pct = rho_per_percent(totals.rho);
 
-        spdlog::info("");
-        spdlog::info("Portfolio totals");
-        spdlog::info("  Market value: {:.4f}", portfolio_value);
-        spdlog::info("  Δ: {:.4f} shares", totals.delta);
-        spdlog::info("  Γ: {:.4f} 1/$^2", totals.gamma);
-        spdlog::info("  ν: {:.4f} $ per 1% vol", portfolio_vega_pct);
-        spdlog::info("  Θ: {:.4f} $ per day", portfolio_theta_day);
-        spdlog::info("  ρ: {:.4f} $ per 1% rate", portfolio_rho_pct);
+        spdlog::debug("");
+        spdlog::debug("Portfolio totals");
+        spdlog::debug("  Market value: {:.4f}", portfolio_value);
+        spdlog::debug("  Δ: {:.4f} shares", totals.delta);
+        spdlog::debug("  Γ: {:.4f} 1/$^2", totals.gamma);
+        spdlog::debug("  ν: {:.4f} $ per 1% vol", portfolio_vega_pct);
+        spdlog::debug("  Θ: {:.4f} $ per day", portfolio_theta_day);
+        spdlog::debug("  ρ: {:.4f} $ per 1% rate", portfolio_rho_pct);
 
         spdlog::info("");
         spdlog::info("==================== Historical ====================");
