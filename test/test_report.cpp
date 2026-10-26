@@ -47,7 +47,7 @@ TEST_CASE("write_risk_csv emits input rows then a portfolio row with blanks wher
     call.underlying_price = 101.11;
     call.underlying_index = 1;
     call.strike = 105.0;
-    call.time_to_maturity = 0.5;
+    call.days_to_maturity = 182.5;
     call.implied_vol = 0.25;
     call.rate = 0.02;
 
@@ -67,7 +67,7 @@ TEST_CASE("write_risk_csv emits input rows then a portfolio row with blanks wher
     REQUIRE(lines.size() == 4); // header + 2 instruments + portfolio
 
     REQUIRE(lines[0] ==
-            "symbol,instrument,strike,years_to_expiry,qty,position_value,"
+            "symbol,instrument,strike,days_to_expiry,qty,position_value,"
             "position_delta,position_gamma,position_vega_per_1pct,position_theta_per_day,"
             "hist_var_99_1d,mc_var_99_1d");
     const auto header = cells(lines[0]);
@@ -89,7 +89,7 @@ TEST_CASE("write_risk_csv emits input rows then a portfolio row with blanks wher
     REQUIRE(opt[0] == "QQQ");
     REQUIRE(opt[1] == "call");
     REQUIRE(opt[2] == "105");
-    REQUIRE(opt[3] == "0.5");
+    REQUIRE(opt[3] == "182.5");
     REQUIRE(opt[4] == "10");
     REQUIRE(opt[6] == "4.726553");            // position delta = qty x per-contract delta
     for (std::size_t c = 6; c < 10; ++c) {

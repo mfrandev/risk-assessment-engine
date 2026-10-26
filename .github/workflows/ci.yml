@@ -46,7 +46,7 @@ jobs:
 
       - name: Check the report layout
         run: |
-          expected='symbol,instrument,strike,years_to_expiry,qty,position_value,position_delta,position_gamma,position_vega_per_1pct,position_theta_per_day,hist_var_99_1d,mc_var_99_1d'
+          expected='symbol,instrument,strike,days_to_expiry,qty,position_value,position_delta,position_gamma,position_vega_per_1pct,position_theta_per_day,hist_var_99_1d,mc_var_99_1d'
           report="$RUNNER_TEMP/risk_output.csv"
           cat "$report"
           [ "$(head -n 1 "$report")" = "$expected" ] || { echo "unexpected header"; exit 1; }

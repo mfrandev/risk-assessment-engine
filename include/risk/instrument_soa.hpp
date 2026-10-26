@@ -18,7 +18,7 @@ struct InstrumentSoA {
     std::vector<double> underlying_price;
     std::vector<std::uint32_t> underlying_index;
     std::vector<double> strike;
-    std::vector<double> time_to_maturity;
+    std::vector<double> days_to_maturity;
     std::vector<double> implied_vol;
     std::vector<double> rate;
 

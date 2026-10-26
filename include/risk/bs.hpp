@@ -22,23 +22,23 @@ double price(bool is_call,
              double strike,
              double rate,
              double volatility,
-             double time_to_maturity);
+             double years_to_maturity);
 
 BSGreeks call(double spot,
               double strike,
               double rate,
               double volatility,
-              double time_to_maturity);
+              double years_to_maturity);
 
 BSGreeks put(double spot,
              double strike,
              double rate,
              double volatility,
-             double time_to_maturity);
+             double years_to_maturity);
 
 double intrinsic(bool is_call, double spot, double strike);
 
-double safe_time_to_maturity(double time_to_maturity);
+double safe_time_to_maturity(double years_to_maturity);
 
 } // namespace bs
 

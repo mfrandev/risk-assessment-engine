@@ -165,7 +165,7 @@ risk::InstrumentSoA load_portfolio_data(int handle, std::size_t universe_size) {
         "underlying_price",
         "underlying_index",
         "strike",
-        "time_to_maturity",
+        "days_to_maturity",
         "implied_vol",
         "rate"};
     for (std::size_t i = 0; i < names.size(); ++i) {
@@ -193,7 +193,7 @@ risk::InstrumentSoA load_portfolio_data(int handle, std::size_t universe_size) {
     enforce_condition(underlying_price_col->t == 9, "`underlying_price` must be float");
     enforce_condition(underlying_index_col->t == 6, "`underlying_index` must be int");
     enforce_condition(strike_col->t == 9, "`strike` must be float");
-    enforce_condition(ttm_col->t == 9, "`time_to_maturity` must be float");
+    enforce_condition(ttm_col->t == 9, "`days_to_maturity` must be float");
     enforce_condition(iv_col->t == 9, "`implied_vol` must be float");
     enforce_condition(rate_col->t == 9, "`rate` must be float");
 
@@ -207,7 +207,7 @@ risk::InstrumentSoA load_portfolio_data(int handle, std::size_t universe_size) {
     enforce_condition(static_cast<std::size_t>(underlying_index_col->n) == rows,
                       "`underlying_index` row count mismatch");
     enforce_condition(static_cast<std::size_t>(strike_col->n) == rows, "`strike` row count mismatch");
-    enforce_condition(static_cast<std::size_t>(ttm_col->n) == rows, "`time_to_maturity` row count mismatch");
+    enforce_condition(static_cast<std::size_t>(ttm_col->n) == rows, "`days_to_maturity` row count mismatch");
     enforce_condition(static_cast<std::size_t>(iv_col->n) == rows, "`implied_vol` row count mismatch");
     enforce_condition(static_cast<std::size_t>(rate_col->n) == rows, "`rate` row count mismatch");
 
@@ -250,7 +250,7 @@ risk::InstrumentSoA load_portfolio_data(int handle, std::size_t universe_size) {
             portfolio.underlying_price.push_back(current_price);
             portfolio.underlying_index.push_back(id);
             portfolio.strike.push_back(0.0);
-            portfolio.time_to_maturity.push_back(0.0);
+            portfolio.days_to_maturity.push_back(0.0);
             portfolio.implied_vol.push_back(0.0);
             portfolio.rate.push_back(0.0);
             continue;
@@ -271,8 +271,8 @@ risk::InstrumentSoA load_portfolio_data(int handle, std::size_t universe_size) {
         enforce_condition(std::isfinite(strike) && strike > 0.0,
                           "Portfolio strike invalid at row " + std::to_string(row));
 
-        const double time_to_maturity = std::max(ttms[row], 0.0);
-        enforce_condition(std::isfinite(time_to_maturity), "Portfolio time_to_maturity invalid at row " +
+        const double days_to_maturity = std::max(ttms[row], 0.0);
+        enforce_condition(std::isfinite(days_to_maturity), "Portfolio days_to_maturity invalid at row " +
                                                            std::to_string(row));
 
         double implied_vol = ivs[row];
@@ -290,7 +290,7 @@ risk::InstrumentSoA load_portfolio_data(int handle, std::size_t universe_size) {
         portfolio.underlying_price.push_back(underlying_price);
         portfolio.underlying_index.push_back(underlying_index);
         portfolio.strike.push_back(strike);
-        portfolio.time_to_maturity.push_back(time_to_maturity);
+        portfolio.days_to_maturity.push_back(days_to_maturity);
         portfolio.implied_vol.push_back(implied_vol);
         portfolio.rate.push_back(rate);
     }

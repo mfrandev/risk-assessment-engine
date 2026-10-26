@@ -83,29 +83,29 @@ One instrument per row. The header must be exactly these 11 column names in this
 | `underlying_price` | number > 0 | optional, ignored (`current_price` is always used) | required | Spot of the underlying |
 | `underlying_index` | integer | optional (must equal `id`) | required | Universe id of the option's underlying |
 | `strike` | number > 0 | never read | required | Option strike |
-| `time_to_maturity` | number | optional, discarded | required | Years to expiry (negative values are floored at 0) |
+| `days_to_maturity` | number | optional, discarded | required | Calendar days to expiry (negative values are floored at 0). Converted to years as days / 365 for Black-Scholes. |
 | `implied_vol` | number | optional, discarded | required | Annualised volatility, e.g. `0.25` (floored at 1e-8) |
 | `rate` | number | optional, discarded | optional (default `0`) | Continuously compounded risk-free rate |
 
-For equities, the discarded fields are stored as zero. `time_to_maturity`, `implied_vol`, `rate`, `underlying_price` and `is_call` may be blank, but if filled they must still be valid (finite numbers, and `underlying_price` > 0, `is_call` 0 or 1) or the row is rejected; only `strike` is never read.
+For equities, the discarded fields are stored as zero. `days_to_maturity`, `implied_vol`, `rate`, `underlying_price` and `is_call` may be blank, but if filled they must still be valid (finite numbers, and `underlying_price` > 0, `is_call` 0 or 1) or the row is rejected; only `strike` is never read.
 
 ```csv
-id,type,is_call,qty,current_price,underlying_price,underlying_index,strike,time_to_maturity,implied_vol,rate
+id,type,is_call,qty,current_price,underlying_price,underlying_index,strike,days_to_maturity,implied_vol,rate
 0,0,0,100,461.02,461.02,0,0,0,0,0
-1,1,1,10,15.0,101.11,1,105.0,0.5,0.25,0.02
+1,1,1,10,15.0,101.11,1,105.0,182.5,0.25,0.02
 ```
 
-The sample file is 100 shares of SPY and 10 QQQ calls (strike 105, 6 months, 25% vol).
+The sample file is 100 shares of SPY and 10 QQQ calls (strike 105, 182.5 days to expiry, 25% vol).
 
 ### Output: risk report (`data/output/risk_output.csv`)
-One row per input row, in input order, followed by one final `portfolio` row. Cells that do not apply are left **empty** (never `0`). Numeric results use 6 decimal places; `strike`, `years_to_expiry` and `qty` are echoed as stored (a negative maturity is stored, and shown, as `0`).
+One row per input row, in input order, followed by one final `portfolio` row. Cells that do not apply are left **empty** (never `0`). Numeric results use 6 decimal places; `strike`, `days_to_expiry` and `qty` are echoed as stored (a negative maturity is stored, and shown, as `0`).
 
 | Column | Instrument rows | `portfolio` row | Meaning |
 |---|---|---|---|
 | `symbol` | underlying ticker | empty | e.g. `SPY`, `QQQ` |
 | `instrument` | `equity`, `call` or `put` | `portfolio` | Row kind |
 | `strike` | options only | empty | Option strike |
-| `years_to_expiry` | options only | empty | Time to maturity in years |
+| `days_to_expiry` | options only | empty | Calendar days to expiry, as given in the input |
 | `qty` | always | empty | Position size in units of the underlying |
 | `position_value` | always | total | `qty` x price in dollars. Options use the Black-Scholes price, equities the market price. |
 | `position_delta` | options only | total | `qty` x per-contract delta, in units of the underlying. The total includes the delta-one equity exposure, although equity rows leave their delta blank. |
@@ -120,9 +120,9 @@ All greeks are **position-level** (already multiplied by `qty`), so they are not
 Sample (from `data/output/risk_output.csv`):
 
 ```csv
-symbol,instrument,strike,years_to_expiry,qty,position_value,position_delta,position_gamma,position_vega_per_1pct,position_theta_per_day,hist_var_99_1d,mc_var_99_1d
+symbol,instrument,strike,days_to_expiry,qty,position_value,position_delta,position_gamma,position_vega_per_1pct,position_theta_per_day,hist_var_99_1d,mc_var_99_1d
 SPY,equity,,,100,46102.000000,,,,,,
-QQQ,call,105,0.5,10,58.875237,4.726553,0.222674,2.845558,-0.315553,,
+QQQ,call,105,182.5,10,58.875237,4.726553,0.222674,2.845558,-0.315553,,
 ,portfolio,,,,46160.875237,104.726553,0.222674,2.845558,-0.315553,286.108783,837.872073
 ```
 
@@ -130,7 +130,7 @@ Note that the sample option's quoted `current_price` (15.0) differs from its Bla
 
 ## Calculations
 
-All run parameters are named constants in [include/risk/config.hpp](include/risk/config.hpp): 99% confidence, 1-day horizon, 200,000 Monte Carlo paths, fixed seed, 252 trading days per year.
+All run parameters are named constants in [include/risk/config.hpp](include/risk/config.hpp): 99% confidence, 1-day horizon, 200,000 Monte Carlo paths, fixed seed, 252 trading days per year. Option expiries are converted from calendar days to years as days / 365, while theta is reported per trading day (annual theta / 252).
 
 ### Shocks
 For consecutive rows of closes, the shock of each ticker is its simple one-day return, `P(t) / P(t-1) - 1`. A history of T rows gives T-1 scenarios.
@@ -139,7 +139,7 @@ For consecutive rows of closes, the shock of each ticker is its simple one-day r
 Every VaR scenario applies one row of shocks to the book and measures the P&L, `value(shocked) - value(today)`:
 
 - **Equity**: price x (1 + shock of its ticker).
-- **Option**: Black-Scholes price at spot x (1 + shock of its underlying), with strike, volatility, rate and time to maturity held fixed (no time decay, no volatility or rate shocks). Both the "today" and the "shocked" values are model prices, so a zero shock gives exactly zero P&L regardless of the market quote.
+- **Option**: Black-Scholes price at spot x (1 + shock of its underlying), with strike, volatility, rate and days to maturity held fixed (no time decay, no volatility or rate shocks). Both the "today" and the "shocked" values are model prices, so a zero shock gives exactly zero P&L regardless of the market quote.
 
 ### Historical VaR (`hist_var_99_1d`)
 Revalue the portfolio under each historical shock row and collect the P&Ls. VaR is the loss at the 1% quantile of that distribution, taken as an order statistic at rank `floor(q x (n-1))` without interpolation. VaR is reported as the negated quantile P&L (a loss is positive). The code also computes expected shortfall (the average P&L at or below that quantile) in `metrics_from_pnls`, but the report does not include it.

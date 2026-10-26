@@ -33,7 +33,7 @@ TEST_CASE("compute_greeks matches analytic Black-Scholes outputs") {
     call.underlying_price = 50.0;
     call.underlying_index = 0;
     call.strike = 55.0;
-    call.time_to_maturity = 0.5;
+    call.days_to_maturity = 182.5;
     call.implied_vol = 0.30;
     call.rate = 0.01;
 
@@ -86,7 +86,7 @@ TEST_CASE("per-contract delta is bounded and position delta scales by quantity")
     call.underlying_price = 101.11;
     call.underlying_index = 1;
     call.strike = 105.0;
-    call.time_to_maturity = 0.5;
+    call.days_to_maturity = 182.5;
     call.implied_vol = 0.25;
     call.rate = 0.02;
 
@@ -139,4 +139,28 @@ TEST_CASE("Black-Scholes greeks match finite-difference bumps and put-call parit
     const auto p = risk::bs::put(spot, strike, rate, vol, tau);
     REQUIRE(c.price - p.price == Approx(spot - strike * std::exp(-rate * tau)).epsilon(1e-9));
     REQUIRE(c.delta - p.delta == Approx(1.0).epsilon(1e-9));
+}
+
+TEST_CASE("option expiry is given in calendar days and converted to years with a 365-day year") {
+    risk::Instrument call{};
+    call.id = 1;
+    call.type = risk::InstrumentType::Option;
+    call.is_call = true;
+    call.qty = 1.0;
+    call.current_price = 5.0;
+    call.underlying_price = 100.0;
+    call.underlying_index = 1;
+    call.strike = 100.0;
+    call.days_to_maturity = 365.0;
+    call.implied_vol = 0.20;
+    call.rate = 0.05;
+
+    const auto soa = risk::to_struct_of_arrays({call});
+    std::vector<risk::bs::BSGreeks> per_contract;
+    std::vector<risk::bs::BSGreeks> per_position;
+    risk::GreeksSummary totals;
+    risk::compute_greeks(soa, per_contract, per_position, totals);
+
+    // 365 days is exactly one year: matches the one-year Black-Scholes reference value.
+    REQUIRE(per_contract[0].price == Approx(10.4505835721856).margin(kTolerance));
 }

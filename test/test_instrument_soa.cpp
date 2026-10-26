@@ -25,7 +25,7 @@ TEST_CASE("to_struct_of_arrays preserves instrument fields") {
     option.underlying_price = 20.0;
     option.underlying_index = 0;
     option.strike = 25.0;
-    option.time_to_maturity = 0.75;
+    option.days_to_maturity = 273.75;
     option.implied_vol = 0.35;
     option.rate = 0.02;
 
@@ -45,6 +45,6 @@ TEST_CASE("to_struct_of_arrays preserves instrument fields") {
     REQUIRE(soa.qty[1] == Approx(option.qty));
     REQUIRE(soa.strike[1] == Approx(option.strike));
     REQUIRE(soa.implied_vol[1] == Approx(option.implied_vol));
-    REQUIRE(soa.time_to_maturity[1] == Approx(option.time_to_maturity));
+    REQUIRE(soa.days_to_maturity[1] == Approx(option.days_to_maturity));
     REQUIRE(soa.rate[1] == Approx(option.rate));
 }

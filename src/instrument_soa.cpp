@@ -11,7 +11,7 @@ void InstrumentSoA::reserve(std::size_t n) {
     underlying_price.reserve(n);
     underlying_index.reserve(n);
     strike.reserve(n);
-    time_to_maturity.reserve(n);
+    days_to_maturity.reserve(n);
     implied_vol.reserve(n);
     rate.reserve(n);
 }
@@ -33,7 +33,7 @@ InstrumentSoA to_struct_of_arrays(const std::vector<Instrument>& instruments) {
         soa.underlying_price.push_back(inst.underlying_price);
         soa.underlying_index.push_back(inst.underlying_index);
         soa.strike.push_back(inst.strike);
-        soa.time_to_maturity.push_back(inst.time_to_maturity);
+        soa.days_to_maturity.push_back(inst.days_to_maturity);
         soa.implied_vol.push_back(inst.implied_vol);
         soa.rate.push_back(inst.rate);
     }

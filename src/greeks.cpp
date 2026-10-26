@@ -1,5 +1,7 @@
 #include <risk/greeks.hpp>
 
+#include <risk/config.hpp>
+
 #include <cmath>
 #include <limits>
 
@@ -30,13 +32,13 @@ void compute_greeks(const InstrumentSoA& instruments,
                              instruments.strike[i],
                              instruments.rate[i],
                              instruments.implied_vol[i],
-                             instruments.time_to_maturity[i]);
+                             years_from_days(instruments.days_to_maturity[i]));
             } else {
                 g = bs::put(spot,
                             instruments.strike[i],
                             instruments.rate[i],
                             instruments.implied_vol[i],
-                            instruments.time_to_maturity[i]);
+                            years_from_days(instruments.days_to_maturity[i]));
             }
         } else { // Equity treated as delta-one
             g.price = instruments.current_price[i];

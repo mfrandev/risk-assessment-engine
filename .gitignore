@@ -51,3 +51,6 @@ notes/
 
 # Generated risk reports
 data/output/*.csv
+
+# macOS
+.DS_Store

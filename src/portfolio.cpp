@@ -29,7 +29,7 @@ const char* kPortfolioHeader[kPortfolioColumns] = {
     "underlying_price",
     "underlying_index",
     "strike",
-    "time_to_maturity",
+    "days_to_maturity",
     "implied_vol",
     "rate"
 };
@@ -91,7 +91,7 @@ void clear_soa(InstrumentSoA& soa) {
     soa.underlying_price.clear();
     soa.underlying_index.clear();
     soa.strike.clear();
-    soa.time_to_maturity.clear();
+    soa.days_to_maturity.clear();
     soa.implied_vol.clear();
     soa.rate.clear();
 }
@@ -216,13 +216,13 @@ bool load_portfolio_csv(const std::string& path,
             }
         }
 
-        double time_to_maturity = 0.0;
-        if (!parse_double(fields[8], type == static_cast<std::uint8_t>(InstrumentType::Option), 0.0, time_to_maturity)) {
-            spdlog::error("Invalid time_to_maturity in portfolio row {}", row_index);
+        double days_to_maturity = 0.0;
+        if (!parse_double(fields[8], type == static_cast<std::uint8_t>(InstrumentType::Option), 0.0, days_to_maturity)) {
+            spdlog::error("Invalid days_to_maturity in portfolio row {}", row_index);
             clear_soa(soa);
             return false;
         }
-        time_to_maturity = std::max(time_to_maturity, 0.0);
+        days_to_maturity = std::max(days_to_maturity, 0.0);
 
         double implied_vol = 0.0;
         if (!parse_double(fields[9], type == static_cast<std::uint8_t>(InstrumentType::Option), 0.0, implied_vol)) {
@@ -252,7 +252,7 @@ bool load_portfolio_csv(const std::string& path,
             soa.underlying_price.push_back(current_price);
             soa.underlying_index.push_back(id);
             soa.strike.push_back(0.0);
-            soa.time_to_maturity.push_back(0.0);
+            soa.days_to_maturity.push_back(0.0);
             soa.implied_vol.push_back(0.0);
             soa.rate.push_back(0.0);
         } else {
@@ -264,7 +264,7 @@ bool load_portfolio_csv(const std::string& path,
             soa.underlying_price.push_back(underlying_price);
             soa.underlying_index.push_back(underlying_index);
             soa.strike.push_back(strike);
-            soa.time_to_maturity.push_back(time_to_maturity);
+            soa.days_to_maturity.push_back(days_to_maturity);
             soa.implied_vol.push_back(implied_vol);
             soa.rate.push_back(rate);
         }

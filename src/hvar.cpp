@@ -5,6 +5,7 @@
 #include <stdexcept>
 
 #include <risk/bs.hpp>
+#include <risk/config.hpp>
 #include <risk/instrument.hpp>
 #include <risk/universe.hpp>
 #include <risk/utils.hpp>
@@ -49,7 +50,7 @@ double hvarday(const InstrumentSoA& soa, const double* shocks_row) {
                                                 : price_today;
             const double underlying_shocked = underlying_today * (1.0 + spot_shock);
             const double sigma = clamp_positive(soa.implied_vol[i], 1e-8);
-            const double time_to_maturity = std::max(soa.time_to_maturity[i], 0.0);
+            const double years_to_maturity = years_from_days(std::max(soa.days_to_maturity[i], 0.0));
 
             // Price both legs with the model so a zero shock gives zero P&L; the market
             // quote in current_price would otherwise mix quote and model values.
@@ -58,13 +59,13 @@ double hvarday(const InstrumentSoA& soa, const double* shocks_row) {
                                     soa.strike[i],
                                     soa.rate[i],
                                     sigma,
-                                    time_to_maturity);
+                                    years_to_maturity);
             price_shocked = bs::price(soa.is_call[i] != 0,
                                       underlying_shocked,
                                       soa.strike[i],
                                       soa.rate[i],
                                       sigma,
-                                      time_to_maturity);
+                                      years_to_maturity);
             applied_shock = spot_shock;
         } else {
             const std::uint32_t id = soa.id[i];

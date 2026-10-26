@@ -16,7 +16,7 @@ struct alignas(64) Instrument {
     double underlying_price = 0.0;
     std::uint32_t underlying_index = 0;
     double strike = 0.0;
-    double time_to_maturity = 0.0;
+    double days_to_maturity = 0.0;
     double implied_vol = 0.0;
     double rate = 0.0;
 };

@@ -76,7 +76,7 @@ TEST_CASE("hvarday yields zero P&L for a zero shock even when option quote diffe
     call.underlying_price = 101.11;
     call.underlying_index = 1;
     call.strike = 105.0;
-    call.time_to_maturity = 0.5;
+    call.days_to_maturity = 182.5;
     call.implied_vol = 0.25;
     call.rate = 0.02;
 

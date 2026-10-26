@@ -21,8 +21,8 @@ double normal_pdf(double x) {
     return inv_sqrt_2pi * std::exp(-0.5 * x * x);
 }
 
-double safe_time_to_maturity(double time_to_maturity) {
-    return std::max(time_to_maturity, kMinTime);
+double safe_time_to_maturity(double years_to_maturity) {
+    return std::max(years_to_maturity, kMinTime);
 }
 
 double intrinsic(bool is_call, double spot, double strike) {
@@ -37,12 +37,12 @@ double price(bool is_call,
              double strike,
              double rate,
              double volatility,
-             double time_to_maturity) {
+             double years_to_maturity) {
     if (spot <= 0.0 || strike <= 0.0) {
         return 0.0;
     }
 
-    const double tau = safe_time_to_maturity(time_to_maturity);
+    const double tau = safe_time_to_maturity(years_to_maturity);
     const double vol = std::max(volatility, kMinVol);
 
     const double sqrt_tau = std::sqrt(tau);
@@ -64,8 +64,8 @@ BSGreeks finish_greeks(bool is_call,
                        double strike,
                        double rate,
                        double volatility,
-                       double time_to_maturity) {
-    const double tau = safe_time_to_maturity(time_to_maturity);
+                       double years_to_maturity) {
+    const double tau = safe_time_to_maturity(years_to_maturity);
     const double vol = std::max(volatility, kMinVol);
     const double sqrt_tau = std::sqrt(tau);
 
@@ -116,16 +116,16 @@ BSGreeks call(double spot,
               double strike,
               double rate,
               double volatility,
-              double time_to_maturity) {
-    return finish_greeks(true, spot, strike, rate, volatility, time_to_maturity);
+              double years_to_maturity) {
+    return finish_greeks(true, spot, strike, rate, volatility, years_to_maturity);
 }
 
 BSGreeks put(double spot,
              double strike,
              double rate,
              double volatility,
-             double time_to_maturity) {
-    return finish_greeks(false, spot, strike, rate, volatility, time_to_maturity);
+             double years_to_maturity) {
+    return finish_greeks(false, spot, strike, rate, volatility, years_to_maturity);
 }
 
 } // namespace bs

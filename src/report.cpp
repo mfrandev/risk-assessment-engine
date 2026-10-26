@@ -17,12 +17,12 @@ namespace {
 // Units are part of the column names: vega is per 1% vol move, theta per trading day, VaR is
 // a positive 99% one-day dollar loss.
 constexpr const char* kHeader =
-    "symbol,instrument,strike,years_to_expiry,qty,position_value,"
+    "symbol,instrument,strike,days_to_expiry,qty,position_value,"
     "position_delta,position_gamma,position_vega_per_1pct,position_theta_per_day,"
     "hist_var_99_1d,mc_var_99_1d";
 
 constexpr std::size_t kLeadingColumns = 2;   // symbol, instrument
-constexpr std::size_t kContractColumns = 2;  // strike, years_to_expiry
+constexpr std::size_t kContractColumns = 2;  // strike, days_to_expiry
 constexpr std::size_t kGreekColumns = 4;     // delta, gamma, vega, theta
 
 std::string number(double value) {
@@ -74,7 +74,7 @@ void write_risk_csv(std::ostream& out, const RiskReport& report) {
         // Strike, expiry and greeks only apply to options; equities leave them empty.
         if (is_option) {
             cells.push_back(fmt::format("{}", pf.strike[i]));
-            cells.push_back(fmt::format("{}", pf.time_to_maturity[i]));
+            cells.push_back(fmt::format("{}", pf.days_to_maturity[i]));
         } else {
             append_blank(cells, kContractColumns);
         }
