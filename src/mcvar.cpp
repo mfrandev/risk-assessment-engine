@@ -1,6 +1,5 @@
 #include <risk/mcvar.hpp>
 
-#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <random>
@@ -10,7 +9,6 @@
 
 #include <risk/hvar.hpp>
 #include <risk/universe.hpp>
-#include <risk/utils.hpp>
 
 namespace risk {
 
@@ -121,27 +119,7 @@ RiskMetrics compute_mcvar(const InstrumentSoA& soa,
         pnls[static_cast<std::size_t>(path)] = hvarday(soa, shocks.data());
     }
 
-    std::vector<double> pnls_copy = pnls;
-    const double q = std::clamp(1.0 - alpha, 0.0, 1.0);
-    const double var_quantile = quantile_inplace(pnls_copy, q);
-
-    double tail_sum = 0.0;
-    std::size_t tail_count = 0;
-    for (double pnl : pnls) {
-        if (pnl <= var_quantile) {
-            tail_sum += pnl;
-            ++tail_count;
-        }
-    }
-    if (tail_count == 0) {
-        tail_sum += var_quantile;
-        tail_count = 1;
-    }
-
-    RiskMetrics metrics;
-    metrics.var = -var_quantile;
-    metrics.cvar = -(tail_sum / static_cast<double>(tail_count));
-    return metrics;
+    return metrics_from_pnls(pnls, alpha);
 }
 
 } // namespace risk

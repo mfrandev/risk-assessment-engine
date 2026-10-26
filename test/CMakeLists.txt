@@ -13,12 +13,15 @@ set(PROJECT_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 set(RISK_CORE_SOURCES
     ${PROJECT_ROOT}/src/bs.cpp
+    ${PROJECT_ROOT}/src/csv.cpp
     ${PROJECT_ROOT}/src/greeks.cpp
     ${PROJECT_ROOT}/src/hvar.cpp
     ${PROJECT_ROOT}/src/instrument_soa.cpp
     ${PROJECT_ROOT}/src/market.cpp
     ${PROJECT_ROOT}/src/mcvar.cpp
     ${PROJECT_ROOT}/src/portfolio.cpp
+    ${PROJECT_ROOT}/src/report.cpp
+    ${PROJECT_ROOT}/src/stats.cpp
     ${PROJECT_ROOT}/src/universe.cpp
     ${PROJECT_ROOT}/src/utils.cpp
 )

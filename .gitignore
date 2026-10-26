@@ -48,3 +48,6 @@ build_test/
 .vscode/
 
 notes/
+
+# Generated risk reports
+data/output/*.csv

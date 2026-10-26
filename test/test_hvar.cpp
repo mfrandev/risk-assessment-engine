@@ -62,3 +62,35 @@ TEST_CASE("compute_hvar validates shock dimensions") {
                                          0.95),
                       std::invalid_argument);
 }
+
+TEST_CASE("hvarday yields zero P&L for a zero shock even when option quote differs from model price") {
+    risk::set_universe({"SPY", "QQQ", "XOM", "TSLA", "AAPL", "WMT"});
+    const std::size_t universe_size = risk::universe_size();
+
+    risk::Instrument call{};
+    call.id = 1;
+    call.type = risk::InstrumentType::Option;
+    call.is_call = true;
+    call.qty = 10.0;
+    call.current_price = 15.0; // market quote deliberately far from the Black-Scholes value
+    call.underlying_price = 101.11;
+    call.underlying_index = 1;
+    call.strike = 105.0;
+    call.time_to_maturity = 0.5;
+    call.implied_vol = 0.25;
+    call.rate = 0.02;
+
+    const auto soa = risk::to_struct_of_arrays({call});
+    const std::vector<double> zero_shock(universe_size, 0.0);
+
+    REQUIRE(risk::hvarday(soa, zero_shock.data()) == Approx(0.0).margin(1e-9));
+}
+
+TEST_CASE("metrics_from_pnls reports losses as positive VaR and tail-average ES") {
+    const std::vector<double> pnls{-10.0, -4.0, 1.0, 2.0, 3.0};
+
+    // alpha = 0.5 -> q = 0.5, quantile rank 2 -> pnl 1.0; tail = {-10, -4, 1}
+    const auto metrics = risk::metrics_from_pnls(pnls, 0.5);
+    REQUIRE(metrics.var == Approx(-1.0));
+    REQUIRE(metrics.cvar == Approx(13.0 / 3.0));
+}

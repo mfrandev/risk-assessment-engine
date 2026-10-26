@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: "Ubuntu / GCC",   os: ubuntu-latest, cxx: g++ }
+          - { name: "Ubuntu / Clang", os: ubuntu-latest, cxx: clang++ }
+          - { name: "macOS / Clang",  os: macos-latest,  cxx: clang++ }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # KDB+ is off by default, so only the libraries the default build needs are fetched.
+      - name: Fetch required submodules
+        run: git submodule update --init lib/CLI11 lib/spdlog lib/Catch2
+
+      - name: Configure engine (Release, KDB+ off)
+        run: cmake -S src -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+
+      - name: Build engine
+        run: cmake --build build --parallel
+
+      - name: Run engine on the sample data
+        run: >
+          ./build/risk_assessment_engine
+          --portfolio data/portfolio/portfolio_scenario1.csv
+          --market data/market/market_scenario1.csv
+          --output "$RUNNER_TEMP/risk_output.csv"
+
+      - name: Check the report layout
+        run: |
+          expected='symbol,instrument,strike,years_to_expiry,qty,position_value,position_delta,position_gamma,position_vega_per_1pct,position_theta_per_day,hist_var_99_1d,mc_var_99_1d'
+          report="$RUNNER_TEMP/risk_output.csv"
+          cat "$report"
+          [ "$(head -n 1 "$report")" = "$expected" ] || { echo "unexpected header"; exit 1; }
+          [ "$(wc -l < "$report" | tr -d ' ')" = "4" ] || { echo "expected 4 lines"; exit 1; }
+          awk -F, 'NF != 12 { print "line " NR " has " NF " columns"; bad = 1 } END { exit bad }' "$report"
+
+      - name: Configure tests
+        run: cmake -S test -B build_test -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+
+      - name: Build tests
+        run: cmake --build build_test --parallel
+
+      - name: Run tests
+        run: ./build_test/risk_tests

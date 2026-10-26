@@ -34,7 +34,7 @@ double hvarday(const InstrumentSoA& soa, const double* shocks_row) {
 
     for (std::size_t i = 0; i < instrument_count; ++i) {
         const double qty = soa.qty[i];
-        const double price_today = soa.current_price[i];
+        double price_today = soa.current_price[i];
         double price_shocked = price_today;
         double applied_shock = 0.0;
 
@@ -51,6 +51,14 @@ double hvarday(const InstrumentSoA& soa, const double* shocks_row) {
             const double sigma = clamp_positive(soa.implied_vol[i], 1e-8);
             const double time_to_maturity = std::max(soa.time_to_maturity[i], 0.0);
 
+            // Price both legs with the model so a zero shock gives zero P&L; the market
+            // quote in current_price would otherwise mix quote and model values.
+            price_today = bs::price(soa.is_call[i] != 0,
+                                    underlying_today,
+                                    soa.strike[i],
+                                    soa.rate[i],
+                                    sigma,
+                                    time_to_maturity);
             price_shocked = bs::price(soa.is_call[i] != 0,
                                       underlying_shocked,
                                       soa.strike[i],
@@ -75,6 +83,30 @@ double hvarday(const InstrumentSoA& soa, const double* shocks_row) {
     }
 
     return value_shocked - value_today;
+}
+
+RiskMetrics metrics_from_pnls(const std::vector<double>& pnls, double alpha) {
+    std::vector<double> pnls_copy = pnls;
+    const double q = std::clamp(1.0 - alpha, 0.0, 1.0);
+    const double var_quantile = quantile_inplace(pnls_copy, q);
+
+    double tail_sum = 0.0;
+    std::size_t tail_count = 0;
+    for (double pnl : pnls) {
+        if (pnl <= var_quantile) {
+            tail_sum += pnl;
+            ++tail_count;
+        }
+    }
+    if (tail_count == 0) {
+        tail_sum += var_quantile;
+        tail_count = 1;
+    }
+
+    RiskMetrics metrics;
+    metrics.var = -var_quantile;
+    metrics.cvar = -(tail_sum / static_cast<double>(tail_count));
+    return metrics;
 }
 
 RiskMetrics compute_hvar(const InstrumentSoA& soa,
@@ -104,27 +136,7 @@ RiskMetrics compute_hvar(const InstrumentSoA& soa,
         pnls[t] = hvarday(soa, row);
     }
 
-    std::vector<double> pnls_copy = pnls;
-    const double q = std::clamp(1.0 - alpha, 0.0, 1.0);
-    const double var_quantile = quantile_inplace(pnls_copy, q);
-
-    double tail_sum = 0.0;
-    std::size_t tail_count = 0;
-    for (double pnl : pnls) {
-        if (pnl <= var_quantile) {
-            tail_sum += pnl;
-            ++tail_count;
-        }
-    }
-    if (tail_count == 0) {
-        tail_sum += var_quantile;
-        tail_count = 1;
-    }
-
-    RiskMetrics metrics;
-    metrics.var = -var_quantile;
-    metrics.cvar = -(tail_sum / static_cast<double>(tail_count));
-    return metrics;
+    return metrics_from_pnls(pnls, alpha);
 }
 
 } // namespace risk

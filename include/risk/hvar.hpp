@@ -12,6 +12,9 @@ struct RiskMetrics {
     double cvar = 0.0;
 };
 
+// VaR and expected shortfall (both reported as positive losses) from a P&L sample.
+RiskMetrics metrics_from_pnls(const std::vector<double>& pnls, double alpha);
+
 double hvarday(const InstrumentSoA& soa, const double* shocks_row);
 
 RiskMetrics compute_hvar(const InstrumentSoA& soa,
